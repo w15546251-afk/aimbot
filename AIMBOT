@@ -13,8 +13,8 @@ local LockBind = Enum.KeyCode.V
 local ESP = {
     Chams = false, Names = false, Boxes = false, 
     Health = false, Skeleton = false, LockOn = false, 
-    WallCheck = false, MaxDistance = 500,
-    FOV = 150, Smoothness = 4
+    WallCheck = false, TeamCheck = false, FriendCheck = false,
+    MaxDistance = 500, FOV = 150, Smoothness = 4
 }
 
 --// AUTO-SAVE SYSTEM
@@ -50,7 +50,7 @@ LoadSettings()
 
 --// GUI SETUP
 local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "EliteSystem_V33_FinalFix"
+gui.Name = "EliteSystem_V34_Final"
 gui.ResetOnSpawn = false
 
 local main = Instance.new("Frame", gui)
@@ -205,19 +205,24 @@ local function CreateBind(name, currentKey, callback, parent)
     end)
 end
 
+--// VISUALS TAB
 CreateToggle("Names", "Names", tabs.Visuals)
 CreateToggle("Boxes", "Boxes", tabs.Visuals)
 CreateToggle("Health", "Health", tabs.Visuals)
 CreateToggle("Skeleton", "Skeleton", tabs.Visuals)
 CreateToggle("Chams", "Chams", tabs.Visuals)
 
+--// COMBAT TAB
 CreateToggle("Enable Aim-Lock", "LockOn", tabs.Combat)
 CreateBind("Lock Bind", LockBind, function(k) LockBind = k end, tabs.Combat)
+CreateToggle("Team Check", "TeamCheck", tabs.Combat)
+CreateToggle("Friend Check", "FriendCheck", tabs.Combat)
 CreateToggle("Wall Check", "WallCheck", tabs.Combat)
 CreateSlider("Aim FOV", 50, 800, "FOV", tabs.Combat)
 CreateSlider("Smoothness", 1, 10, "Smoothness", tabs.Combat)
 CreateSlider("Max Range", 50, 5000, "MaxDistance", tabs.Combat)
 
+--// SETTINGS TAB
 CreateBind("Menu Key", MenuKey, function(k) MenuKey = k end, tabs.Settings)
 
 --// LOGIC
@@ -270,6 +275,18 @@ RunService.RenderStepped:Connect(function(dt)
         for _, l in pairs(d.Skeleton) do l.Visible = false end
 
         if p == LocalPlayer then continue end
+
+        -- TEAM & FRIEND CHECKS
+        if ESP.TeamCheck and p.Team == LocalPlayer.Team then 
+            local h = p.Character and p.Character:FindFirstChild("EliteCham")
+            if h then h:Destroy() end
+            continue 
+        end
+        if ESP.FriendCheck and LocalPlayer:IsFriendsWith(p.UserId) then 
+            local h = p.Character and p.Character:FindFirstChild("EliteCham")
+            if h then h:Destroy() end
+            continue 
+        end
 
         local char = p.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -340,9 +357,9 @@ end)
 local function Cleanup(p)
     if Drawings[p] then
         for _, obj in pairs(Drawings[p]) do
-            if typeof(obj) == "table" then -- For Skeleton lines
+            if typeof(obj) == "table" then 
                 for _, line in pairs(obj) do line:Remove() end
-            elseif typeof(obj) == "userdata" then -- For Squares/Text
+            elseif typeof(obj) == "userdata" then
                 obj:Remove()
             end
         end
