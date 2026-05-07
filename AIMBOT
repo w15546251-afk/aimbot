@@ -2,23 +2,55 @@
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
---// SETTINGS
+--// SETTINGS & DEFAULTS
 local MenuKey = Enum.KeyCode.RightControl
 local LockBind = Enum.KeyCode.V 
 local ESP = {
     Chams = false, Names = false, Boxes = false, 
     Health = false, Skeleton = false, LockOn = false, 
-    WallCheck = false, MaxDistance = 500, -- Now only affects Aimlock
+    WallCheck = false, MaxDistance = 500,
     FOV = 150, Smoothness = 4
 }
 
+--// AUTO-SAVE SYSTEM
+local ConfigFile = "EliteSettings.json"
+
+local function SaveSettings()
+    pcall(function()
+        local data = {
+            ESP = ESP,
+            MenuKey = MenuKey.Name,
+            LockBind = tostring(LockBind):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+        }
+        writefile(ConfigFile, HttpService:JSONEncode(data))
+    end)
+end
+
+local function LoadSettings()
+    if isfile(ConfigFile) then
+        local success, data = pcall(function() return HttpService:JSONDecode(readfile(ConfigFile)) end)
+        if success then
+            for k, v in pairs(data.ESP) do if ESP[k] ~= nil then ESP[k] = v end end
+            pcall(function() MenuKey = Enum.KeyCode[data.MenuKey] end)
+            if data.LockBind == "MouseButton2" then
+                LockBind = Enum.UserInputType.MouseButton2
+            else
+                pcall(function() LockBind = Enum.KeyCode[data.LockBind] end)
+            end
+        end
+    end
+end
+
+LoadSettings()
+
 --// GUI SETUP
 local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "EliteSystem_V26"
+gui.Name = "EliteSystem_V33_FinalFix"
 gui.ResetOnSpawn = false
 
 local main = Instance.new("Frame", gui)
@@ -35,7 +67,7 @@ sidebar.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
 Instance.new("UICorner", sidebar)
 
 local sideLayout = Instance.new("UIListLayout", sidebar)
-sideLayout.Padding = UDim.new(0, 10)
+sideLayout.Padding = UDim.new(0, 5)
 sideLayout.HorizontalAlignment = "Center"
 sideLayout.VerticalAlignment = "Center"
 
@@ -50,13 +82,12 @@ local tabs = {
     Settings = Instance.new("ScrollingFrame", content)
 }
 
-for _, name in pairs({"Visuals", "Combat", "Settings"}) do
-    local frame = tabs[name]
+for name, frame in pairs(tabs) do
     frame.Size = UDim2.new(1, 0, 1, 0)
     frame.BackgroundTransparency = 1
     frame.Visible = (name == "Visuals")
     frame.ScrollBarThickness = 2
-    frame.CanvasSize = UDim2.new(0, 0, 0, 600)
+    frame.CanvasSize = UDim2.new(0, 0, 0, 500)
     Instance.new("UIListLayout", frame).Padding = UDim.new(0, 8)
     
     local btn = Instance.new("TextButton", sidebar)
@@ -75,7 +106,7 @@ end
 
 local lockToggleBtn
 
---// UI CONSTRUCTORS
+--// UI HELPERS
 local function CreateToggle(name, key, parent)
     local holder = Instance.new("Frame", parent)
     holder.Size = UDim2.new(1, -10, 0, 35)
@@ -104,6 +135,7 @@ local function CreateToggle(name, key, parent)
         ESP[key] = not ESP[key]
         btn.Text = ESP[key] and "ON" or "OFF"
         btn.BackgroundColor3 = ESP[key] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(45, 45, 50)
+        SaveSettings()
     end)
 end
 
@@ -138,7 +170,10 @@ local function CreateSlider(name, min, max, key, parent)
                 ESP[key] = val
                 label.Text = "  " .. name .. ": " .. val
                 sliderFill.Size = UDim2.new(rel, 0, 1, 0)
-                if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then con:Disconnect() end
+                if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then 
+                    con:Disconnect() 
+                    SaveSettings()
+                end
             end)
         end
     end)
@@ -146,9 +181,9 @@ end
 
 local function CreateBind(name, currentKey, callback, parent)
     local btn = Instance.new("TextButton", parent)
-    btn.Size = UDim2.new(1, -10, 0, 40)
+    btn.Size = UDim2.new(1, -10, 0, 35)
     btn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-    btn.Text = name .. ": " .. (currentKey.Name or "Unknown")
+    btn.Text = name .. ": " .. (tostring(currentKey):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", ""))
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = "GothamBold"
     Instance.new("UICorner", btn)
@@ -156,46 +191,36 @@ local function CreateBind(name, currentKey, callback, parent)
     local listening = false
     btn.MouseButton1Click:Connect(function()
         listening = true
-        btn.Text = "Press Any Key..."
+        btn.Text = "..."
     end)
     
     UIS.InputBegan:Connect(function(input)
         if listening and (input.UserInputType == Enum.UserInputType.Keyboard or input.UserInputType == Enum.UserInputType.MouseButton2) then
             local key = input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode or input.UserInputType
             listening = false
-            btn.Text = name .. ": " .. (key.Name or "MB2")
+            btn.Text = name .. ": " .. (tostring(key):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", ""))
             callback(key)
+            SaveSettings()
         end
     end)
 end
 
---// FILL TABS
-CreateToggle("Chams (Wallhack)", "Chams", tabs.Visuals)
-CreateToggle("Name Tags (White)", "Names", tabs.Visuals)
-CreateToggle("2D Boxes (White)", "Boxes", tabs.Visuals)
-CreateToggle("Health Bar", "Health", tabs.Visuals)
-CreateToggle("Skeleton ESP", "Skeleton", tabs.Visuals)
+CreateToggle("Names", "Names", tabs.Visuals)
+CreateToggle("Boxes", "Boxes", tabs.Visuals)
+CreateToggle("Health", "Health", tabs.Visuals)
+CreateToggle("Skeleton", "Skeleton", tabs.Visuals)
+CreateToggle("Chams", "Chams", tabs.Visuals)
 
 CreateToggle("Enable Aim-Lock", "LockOn", tabs.Combat)
-CreateBind("Aimlock Bind", LockBind, function(k) LockBind = k end, tabs.Combat)
+CreateBind("Lock Bind", LockBind, function(k) LockBind = k end, tabs.Combat)
 CreateToggle("Wall Check", "WallCheck", tabs.Combat)
-CreateSlider("Target FOV", 50, 800, "FOV", tabs.Combat)
-CreateSlider("Lock Speed", 1, 10, "Smoothness", tabs.Combat)
-CreateSlider("Lock Max Distance", 50, 5000, "MaxDistance", tabs.Combat)
+CreateSlider("Aim FOV", 50, 800, "FOV", tabs.Combat)
+CreateSlider("Smoothness", 1, 10, "Smoothness", tabs.Combat)
+CreateSlider("Max Range", 50, 5000, "MaxDistance", tabs.Combat)
 
 CreateBind("Menu Key", MenuKey, function(k) MenuKey = k end, tabs.Settings)
 
 --// LOGIC
-local function IsVisible(targetPart)
-    if not ESP.WallCheck then return true end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    local result = workspace:Raycast(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position), params)
-    if result then return result.Instance:IsDescendantOf(targetPart.Parent) end
-    return true
-end
-
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1; fovCircle.Color = Color3.new(1, 1, 1); fovCircle.Transparency = 0.5
 
@@ -207,8 +232,8 @@ local SkeletonParts = {
 }
 
 local Drawings = {}
-local function GetDrawings(player)
-    if Drawings[player] then return Drawings[player] end
+local function GetDrawings(p)
+    if Drawings[p] then return Drawings[p] end
     local d = {
         Box = Drawing.new("Square"), Name = Drawing.new("Text"),
         HealthOutline = Drawing.new("Square"), HealthBar = Drawing.new("Square"),
@@ -220,49 +245,49 @@ local function GetDrawings(player)
     for i=1,#SkeletonParts do
         local l = Drawing.new("Line"); l.Thickness = 1; l.Color = Color3.new(1, 1, 1); table.insert(d.Skeleton, l)
     end
-    Drawings[player] = d
+    Drawings[p] = d
     return d
 end
 
-RunService:BindToRenderStep("FinalV26", 201, function(dt)
+local function IsVisible(targetPart)
+    if not ESP.WallCheck then return true end
+    local cast = workspace:Raycast(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position), RaycastParams.new())
+    return not cast or cast.Instance:IsDescendantOf(targetPart.Parent)
+end
+
+RunService.RenderStepped:Connect(function(dt)
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     fovCircle.Visible = ESP.LockOn; fovCircle.Radius = ESP.FOV; fovCircle.Position = screenCenter
 
-    local targetPart = nil
+    local targetHead = nil
     local closestDist = ESP.FOV
 
     for _, p in pairs(Players:GetPlayers()) do
         local d = GetDrawings(p)
         
-        -- Reset Visibility
+        -- Reset every frame
         d.Box.Visible = false; d.Name.Visible = false; d.HealthBar.Visible = false; d.HealthOutline.Visible = false
         for _, l in pairs(d.Skeleton) do l.Visible = false end
 
         if p == LocalPlayer then continue end
 
         local char = p.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
         local head = char and char:FindFirstChild("Head")
 
-        if char and root and hum and hum.Health > 0 then
+        if char and hum and hum.Health > 0 and root and head then
             local dist = (root.Position - Camera.CFrame.Position).Magnitude
             
-            -- CHAMS (Always work if enabled, ignores slider)
             local highlight = char:FindFirstChild("EliteCham")
             if ESP.Chams then
                 if not highlight then
                     highlight = Instance.new("Highlight", char)
                     highlight.Name = "EliteCham"
                     highlight.FillColor = Color3.fromRGB(0, 255, 120)
-                    highlight.OutlineColor = Color3.new(1, 1, 1)
-                    highlight.FillTransparency = 0.5
                 end
-            else
-                if highlight then highlight:Destroy() end
-            end
+            elseif highlight then highlight:Destroy() end
 
-            -- 2D DRAWING (Always work if enabled, ignores slider)
             local rPos, onScreen = Camera:WorldToViewportPoint(root.Position)
             if onScreen then
                 pcall(function()
@@ -275,11 +300,11 @@ RunService:BindToRenderStep("FinalV26", 201, function(dt)
                         d.Box.Visible = true; d.Box.Size = Vector2.new(width, height); d.Box.Position = Vector2.new(rPos.X - width/2, hPos.Y)
                     end
                     if ESP.Names then
-                        d.Name.Visible = true; d.Name.Position = Vector2.new(rPos.X, hPos.Y - 15); d.Name.Text = p.Name .. " [" .. math.floor(dist) .. "]"
+                        d.Name.Visible = true; d.Name.Position = Vector2.new(rPos.X, hPos.Y - 15); d.Name.Text = p.Name
                     end
                     if ESP.Health then
                         local hp = hum.Health / hum.MaxHealth
-                        d.HealthOutline.Visible = true; d.HealthOutline.Position = Vector2.new(rPos.X - width/2 - 6, hPos.Y); d.HealthOutline.Size = Vector2.new(4, height); d.HealthOutline.Color = Color3.new(0, 0, 0)
+                        d.HealthOutline.Visible = true; d.HealthOutline.Position = Vector2.new(rPos.X - width/2 - 6, hPos.Y); d.HealthOutline.Size = Vector2.new(4, height); d.HealthOutline.Color = Color3.new(0,0,0)
                         d.HealthBar.Visible = true; d.HealthBar.Position = Vector2.new(rPos.X - width/2 - 5, hPos.Y + (height * (1-hp))); d.HealthBar.Size = Vector2.new(2, height * hp); d.HealthBar.Color = Color3.fromHSV(hp * 0.3, 1, 1)
                     end
                     if ESP.Skeleton then
@@ -288,40 +313,50 @@ RunService:BindToRenderStep("FinalV26", 201, function(dt)
                             if b1 and b2 then
                                 local v1, o1 = Camera:WorldToViewportPoint(b1.Position)
                                 local v2, o2 = Camera:WorldToViewportPoint(b2.Position)
-                                if o1 and o2 then
-                                    d.Skeleton[i].Visible = true; d.Skeleton[i].From = Vector2.new(v1.X, v1.Y); d.Skeleton[i].To = Vector2.new(v2.X, v2.Y)
-                                end
+                                if o1 and o2 then d.Skeleton[i].Visible = true; d.Skeleton[i].From = Vector2.new(v1.X,v1.Y); d.Skeleton[i].To = Vector2.new(v2.X,v2.Y) end
                             end
                         end
                     end
                     
-                    -- AIMLOCK (ONLY checks distance slider)
                     if ESP.LockOn and dist <= ESP.MaxDistance then
                         local sDist = (Vector2.new(rPos.X, rPos.Y) - screenCenter).Magnitude
-                        if sDist < closestDist and IsVisible(head) then 
-                            closestDist = sDist; targetPart = head 
-                        end
+                        if sDist < closestDist and IsVisible(head) then closestDist = sDist; targetHead = head end
                     end
                 end)
             end
         else
-            -- Cleanup Chams if dead
             local h = char and char:FindFirstChild("EliteCham")
             if h then h:Destroy() end
         end
     end
 
-    if targetPart and ESP.LockOn then
+    if targetHead and ESP.LockOn then
         local alpha = math.clamp((ESP.Smoothness / 10) * (dt * 60), 0.01, 1)
-        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPart.Position), alpha)
+        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetHead.Position), alpha)
     end
 end)
 
--- INPUT HANDLING
+--// FIXED REMOVAL LOGIC
+local function Cleanup(p)
+    if Drawings[p] then
+        for _, obj in pairs(Drawings[p]) do
+            if typeof(obj) == "table" then -- For Skeleton lines
+                for _, line in pairs(obj) do line:Remove() end
+            elseif typeof(obj) == "userdata" then -- For Squares/Text
+                obj:Remove()
+            end
+        end
+        Drawings[p] = nil
+    end
+end
+
+Players.PlayerRemoving:Connect(Cleanup)
+
 UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == MenuKey then
         main.Visible = not main.Visible
+        if not main.Visible then SaveSettings() end
     elseif input.KeyCode == LockBind or input.UserInputType == LockBind then
         ESP.LockOn = not ESP.LockOn
         if lockToggleBtn then
@@ -331,13 +366,4 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- CLEANUP
-Players.PlayerRemoving:Connect(function(p)
-    if Drawings[p] then
-        for _, v in pairs(Drawings[p]) do
-            if typeof(v) == "userdata" then v:Remove() 
-            elseif type(v) == "table" then for _, l in pairs(v) do l:Remove() end end
-        end
-        Drawings[p] = nil
-    end
-end)
+task.spawn(function() while task.wait(10) do SaveSettings() end end)
