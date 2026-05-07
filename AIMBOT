@@ -6,40 +6,36 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
---// SETTINGS & STATES
+--// SETTINGS
 local MenuKey = Enum.KeyCode.RightControl
-local HIGHLIGHT_COLOR = Color3.fromRGB(0, 255, 120)
-
 local ESP = {
     Chams = false, Names = false, Boxes = false, 
     Health = false, Skeleton = false, LockOn = false, 
-    FOV = 150,
-    Smoothness = 5 -- This is your "Hard Lock" intensity
+    WallCheck = false, MaxDistance = 500,
+    FOV = 150, Smoothness = 4, Prediction = 0
 }
 
 --// GUI SETUP
-local gui = Instance.new("ScreenGui")
-gui.Name = "AdvancedSystem_V7"
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "EliteSystem_V18"
 gui.ResetOnSpawn = false
-gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 420, 0, 350)
-main.Position = UDim2.new(0.5, -210, 0.5, -175)
-main.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 420, 0, 400)
+main.Position = UDim2.new(0.5, -210, 0.5, -200)
+main.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
 main.Active = true
 main.Draggable = true
-main.Parent = gui
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", main)
 
 local sidebar = Instance.new("Frame", main)
 sidebar.Size = UDim2.new(0, 110, 1, 0)
-sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
+sidebar.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+Instance.new("UICorner", sidebar)
 
 local sideLayout = Instance.new("UIListLayout", sidebar)
 sideLayout.Padding = UDim.new(0, 5)
-sideLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+sideLayout.HorizontalAlignment = "Center"
 
 local content = Instance.new("Frame", main)
 content.Position = UDim2.new(0, 120, 0, 10)
@@ -60,12 +56,11 @@ for name, frame in pairs(tabs) do
     Instance.new("UIListLayout", frame).Padding = UDim.new(0, 8)
     
     local btn = Instance.new("TextButton", sidebar)
-    btn.Size = UDim2.new(0, 90, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    btn.Size = UDim2.new(0, 95, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     btn.Text = name
     btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
+    btn.Font = "GothamBold"
     Instance.new("UICorner", btn)
     
     btn.MouseButton1Click:Connect(function()
@@ -74,21 +69,19 @@ for name, frame in pairs(tabs) do
     end)
 end
 
---// UI COMPONENTS
+--// UI CONSTRUCTORS
 local function CreateToggle(name, key, parent)
     local holder = Instance.new("Frame", parent)
     holder.Size = UDim2.new(1, 0, 0, 35)
-    holder.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    holder.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     Instance.new("UICorner", holder)
 
     local btn = Instance.new("TextButton", holder)
     btn.Size = UDim2.new(0, 45, 0, 20)
     btn.Position = UDim2.new(1, -50, 0.5, -10)
     btn.Text = ESP[key] and "ON" or "OFF"
-    btn.BackgroundColor3 = ESP[key] and Color3.fromRGB(0, 180, 120) or Color3.fromRGB(50, 50, 55)
+    btn.BackgroundColor3 = ESP[key] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(45, 45, 50)
     btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 10
     Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
     local lbl = Instance.new("TextLabel", holder)
@@ -97,255 +90,217 @@ local function CreateToggle(name, key, parent)
     lbl.TextColor3 = Color3.new(1, 1, 1)
     lbl.BackgroundTransparency = 1
     lbl.TextXAlignment = "Left"
-    lbl.Font = Enum.Font.Gotham
 
     btn.MouseButton1Click:Connect(function()
         ESP[key] = not ESP[key]
         btn.Text = ESP[key] and "ON" or "OFF"
-        btn.BackgroundColor3 = ESP[key] and Color3.fromRGB(0, 180, 120) or Color3.fromRGB(50, 50, 55)
+        btn.BackgroundColor3 = ESP[key] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(45, 45, 50)
     end)
 end
 
 local function CreateSlider(name, min, max, key, parent)
     local holder = Instance.new("Frame", parent)
     holder.Size = UDim2.new(1, 0, 0, 50)
-    holder.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    holder.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     Instance.new("UICorner", holder)
 
     local label = Instance.new("TextLabel", holder)
     label.Text = "  " .. name .. ": " .. ESP[key]
     label.Size = UDim2.new(1, 0, 0, 25)
-    label.BackgroundTransparency = 1
     label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.Gotham
+    label.BackgroundTransparency = 1
     label.TextXAlignment = "Left"
-    label.TextSize = 12
 
     local sliderBg = Instance.new("Frame", holder)
     sliderBg.Size = UDim2.new(0.9, 0, 0, 4)
     sliderBg.Position = UDim2.new(0.05, 0, 0.7, 0)
-    sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 
     local sliderFill = Instance.new("Frame", sliderBg)
     sliderFill.Size = UDim2.new((ESP[key] - min) / (max - min), 0, 1, 0)
-    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 180, 120)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
 
     sliderBg.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local connection
-            connection = RunService.RenderStepped:Connect(function()
-                local mousePos = UIS:GetMouseLocation().X
-                local relativeX = math.clamp((mousePos - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
-                ESP[key] = math.floor(min + (relativeX * (max - min)))
-                label.Text = "  " .. name .. ": " .. ESP[key]
-                sliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
-                if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-                    connection:Disconnect()
-                end
+            local con
+            con = RunService.RenderStepped:Connect(function()
+                local rel = math.clamp((UIS:GetMouseLocation().X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+                local val = math.floor(min + (rel * (max - min)))
+                ESP[key] = val
+                label.Text = "  " .. name .. ": " .. val
+                sliderFill.Size = UDim2.new(rel, 0, 1, 0)
+                if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then con:Disconnect() end
             end)
         end
     end)
 end
 
---// INIT TABS
-CreateToggle("Player Chams", "Chams", tabs.Visuals)
-CreateToggle("Show Names", "Names", tabs.Visuals)
-CreateToggle("Box ESP", "Boxes", tabs.Visuals)
+--// FEATURE INIT
+CreateToggle("Chams (Wallhack)", "Chams", tabs.Visuals)
+CreateToggle("Name Tags", "Names", tabs.Visuals)
+CreateToggle("2D Boxes", "Boxes", tabs.Visuals)
 CreateToggle("Health Bar", "Health", tabs.Visuals)
-CreateToggle("Skeleton", "Skeleton", tabs.Visuals)
+CreateToggle("Skeleton ESP", "Skeleton", tabs.Visuals)
 
-CreateToggle("Enable Aim Lock", "LockOn", tabs.Combat)
-CreateSlider("Lock FOV", 50, 800, "FOV", tabs.Combat)
-CreateSlider("Hard Lock Intensity", 1, 10, "Smoothness", tabs.Combat)
+CreateToggle("Enable Aim-Lock", "LockOn", tabs.Combat)
+CreateToggle("Wall Check", "WallCheck", tabs.Combat)
+CreateSlider("Target FOV", 50, 800, "FOV", tabs.Combat)
+CreateSlider("Lock Speed", 1, 10, "Smoothness", tabs.Combat)
+CreateSlider("Max Distance", 50, 2000, "MaxDistance", tabs.Combat)
 
+-- Keybind Settings
 local bindBtn = Instance.new("TextButton", tabs.Settings)
 bindBtn.Size = UDim2.new(1, 0, 0, 40)
-bindBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+bindBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 bindBtn.Text = "Menu Key: " .. MenuKey.Name
 bindBtn.TextColor3 = Color3.new(1, 1, 1)
-bindBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", bindBtn)
 
 local listening = false
 bindBtn.MouseButton1Click:Connect(function()
     listening = true
-    bindBtn.Text = "Press any key..."
+    bindBtn.Text = "Press Any Key..."
 end)
 
---// DRAWING SYSTEM
-local fovCircle = Drawing.new("Circle")
-fovCircle.Thickness = 1
-fovCircle.Color = Color3.new(1, 1, 1)
-fovCircle.Transparency = 0.5
+--// WALL CHECK LOGIC
+local function IsVisible(targetPart)
+    if not ESP.WallCheck then return true end
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {char, Camera}
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
+    local result = workspace:Raycast(origin, direction, params)
+    if result then return result.Instance:IsDescendantOf(targetPart.Parent) end
+    return true
+end
 
-local Drawings = {}
+--// DRAWING UTILS
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1; fovCircle.Color = Color3.new(1, 1, 1); fovCircle.Transparency = 0.5
+
 local SkeletonParts = {
     {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},
-    {"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},
+    {"LeftUpperArm","LeftLowerArm"},{"LeftUpperArm","LeftHand"},{"UpperTorso","RightUpperArm"},
     {"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"LowerTorso","LeftUpperLeg"},
     {"LeftUpperLeg","LeftLowerLeg"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"}
 }
 
-local function CreateDrawings(player)
+local Drawings = {}
+local function GetDrawings(player)
+    if Drawings[player] then return Drawings[player] end
     local d = {
-        Box = Drawing.new("Square"),
-        HealthOutline = Drawing.new("Square"),
-        HealthBar = Drawing.new("Square"),
-        Name = Drawing.new("Text"),
+        Box = Drawing.new("Square"), Name = Drawing.new("Text"),
+        HealthOutline = Drawing.new("Square"), HealthBar = Drawing.new("Square"),
         Skeleton = {}
     }
-    d.Box.Thickness = 1
-    d.Box.Color = Color3.new(1, 1, 1) 
-    d.Name.Center = true
-    d.Name.Outline = true
-    d.Name.Size = 13
-    d.Name.Color = Color3.new(1, 1, 1)
-    d.HealthBar.Filled = true
-    d.HealthOutline.Filled = true
-    d.HealthOutline.Color = Color3.new(0,0,0)
+    -- Force White ESP Colors
+    d.Box.Thickness = 1; d.Box.Color = Color3.new(1, 1, 1)
+    d.Name.Center = true; d.Name.Outline = true; d.Name.Size = 13; d.Name.Color = Color3.new(1, 1, 1)
+    d.HealthBar.Filled = true; d.HealthOutline.Filled = true
     for i=1,#SkeletonParts do
-        local l = Drawing.new("Line")
-        l.Thickness = 1
-        l.Color = Color3.new(1,1,1)
-        table.insert(d.Skeleton, l)
+        local l = Drawing.new("Line"); l.Thickness = 1; l.Color = Color3.new(1, 1, 1); table.insert(d.Skeleton, l)
     end
     Drawings[player] = d
-end
-
-local function ForceHide(d)
-    if not d then return end
-    d.Box.Visible = false
-    d.Name.Visible = false
-    d.HealthOutline.Visible = false
-    d.HealthBar.Visible = false
-    for _, l in pairs(d.Skeleton) do l.Visible = false end
+    return d
 end
 
 --// MAIN LOOP
-RunService.RenderStepped:Connect(function()
+RunService:BindToRenderStep("SystemSync_V18", 201, function(dt)
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    fovCircle.Visible = ESP.LockOn
-    fovCircle.Radius = ESP.FOV
-    fovCircle.Position = screenCenter
+    fovCircle.Visible = ESP.LockOn; fovCircle.Radius = ESP.FOV; fovCircle.Position = screenCenter
 
-    local targetHead = nil
+    local targetPart = nil
     local closestDist = ESP.FOV
 
     for _, p in pairs(Players:GetPlayers()) do
         if p == LocalPlayer then continue end
-        if not Drawings[p] then CreateDrawings(p) end
-        
-        local d = Drawings[p]
+        local d = GetDrawings(p)
         local char = p.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
         local root = char and char:FindFirstChild("HumanoidRootPart")
-        
-        if char and hum and root and hum.Health > 0 then
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local head = char and char:FindFirstChild("Head")
+
+        if char and root and hum and hum.Health > 0 then
+            local distFromPlayer = (root.Position - Camera.CFrame.Position).Magnitude
             local rPos, onScreen = Camera:WorldToViewportPoint(root.Position)
             
+            -- Chams
+            local highlight = char:FindFirstChild("EliteCham")
+            if ESP.Chams then
+                if not highlight then highlight = Instance.new("Highlight", char); highlight.Name = "EliteCham" end
+                highlight.FillColor = Color3.fromRGB(0, 255, 120); highlight.Enabled = true
+            elseif highlight then highlight:Destroy() end
+
+            -- Visuals
             if onScreen then
-                local head = char:FindFirstChild("Head") or root
-                local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-                local h = math.abs(headPos.Y - legPos.Y)
-                local w = h / 2
-                
-                d.Box.Visible = ESP.Boxes
-                d.Box.Size = Vector2.new(w, h)
-                d.Box.Position = Vector2.new(rPos.X - w/2, headPos.Y)
-                
-                d.Name.Visible = ESP.Names
-                d.Name.Position = Vector2.new(rPos.X, headPos.Y - 15)
-                d.Name.Text = p.Name
-                
+                local hPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local lPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.5, 0))
+                local height = math.abs(hPos.Y - lPos.Y); local width = height / 1.8
+
+                d.Box.Visible = ESP.Boxes; d.Box.Size = Vector2.new(width, height); d.Box.Position = Vector2.new(rPos.X - width/2, hPos.Y)
+                d.Name.Visible = ESP.Names; d.Name.Position = Vector2.new(rPos.X, hPos.Y - 15); d.Name.Text = p.Name .. " [" .. math.floor(distFromPlayer) .. "]"
+
                 if ESP.Health then
                     local hp = hum.Health / hum.MaxHealth
-                    d.HealthOutline.Visible = true
-                    d.HealthOutline.Size = Vector2.new(4, h)
-                    d.HealthOutline.Position = Vector2.new(rPos.X - w/2 - 6, headPos.Y)
-                    d.HealthBar.Visible = true
-                    d.HealthBar.Size = Vector2.new(2, h * hp)
-                    d.HealthBar.Position = Vector2.new(rPos.X - w/2 - 5, headPos.Y + (h * (1-hp)))
-                    d.HealthBar.Color = Color3.fromHSV(hp * 0.3, 1, 1)
-                else
-                    d.HealthBar.Visible = false
-                    d.HealthOutline.Visible = false
-                end
+                    d.HealthOutline.Visible = true; d.HealthOutline.Position = Vector2.new(rPos.X - width/2 - 6, hPos.Y); d.HealthOutline.Size = Vector2.new(4, height); d.HealthOutline.Color = Color3.new(0, 0, 0)
+                    d.HealthBar.Visible = true; d.HealthBar.Position = Vector2.new(rPos.X - width/2 - 5, hPos.Y + (height * (1-hp))); d.HealthBar.Size = Vector2.new(2, height * hp); d.HealthBar.Color = Color3.fromHSV(hp * 0.3, 1, 1)
+                else d.HealthBar.Visible = false; d.HealthOutline.Visible = false end
 
                 if ESP.Skeleton then
                     for i, bones in pairs(SkeletonParts) do
-                        local p1, p2 = char:FindFirstChild(bones[1]), char:FindFirstChild(bones[2])
-                        if p1 and p2 then
-                            local v1, o1 = Camera:WorldToViewportPoint(p1.Position)
-                            local v2, o2 = Camera:WorldToViewportPoint(p2.Position)
-                            d.Skeleton[i].Visible = o1 and o2
-                            d.Skeleton[i].From = Vector2.new(v1.X, v1.Y)
-                            d.Skeleton[i].To = Vector2.new(v2.X, v2.Y)
+                        local b1, b2 = char:FindFirstChild(bones[1]), char:FindFirstChild(bones[2])
+                        if b1 and b2 then
+                            local v1, o1 = Camera:WorldToViewportPoint(b1.Position)
+                            local v2, o2 = Camera:WorldToViewportPoint(b2.Position)
+                            d.Skeleton[i].Visible = o1 and o2; d.Skeleton[i].From = Vector2.new(v1.X, v1.Y); d.Skeleton[i].To = Vector2.new(v2.X, v2.Y)
                         else d.Skeleton[i].Visible = false end
                     end
-                else
-                    for _,l in pairs(d.Skeleton) do l.Visible = false end
-                end
+                else for _, l in pairs(d.Skeleton) do l.Visible = false end end
 
-                -- Chams
-                local highlight = char:FindFirstChild("ESPHighlight")
-                if ESP.Chams then
-                    if not highlight then
-                        highlight = Instance.new("Highlight", char)
-                        highlight.Name = "ESPHighlight"
-                    end
-                    highlight.Enabled = true
-                    highlight.FillColor = HIGHLIGHT_COLOR
-                elseif highlight then
-                    highlight.Enabled = false
-                end
-
-                -- Target Detection
-                if ESP.LockOn then
-                    local dist = (Vector2.new(rPos.X, rPos.Y) - screenCenter).Magnitude
-                    if dist < closestDist then
-                        closestDist = dist
-                        targetHead = head
-                    end
+                if ESP.LockOn and distFromPlayer <= ESP.MaxDistance then
+                    local screenDist = (Vector2.new(rPos.X, rPos.Y) - screenCenter).Magnitude
+                    if screenDist < closestDist and IsVisible(head) then closestDist = screenDist; targetPart = head end
                 end
             else
-                ForceHide(d)
+                d.Box.Visible = false; d.Name.Visible = false; d.HealthBar.Visible = false; d.HealthOutline.Visible = false
+                for _, l in pairs(d.Skeleton) do l.Visible = false end
             end
         else
-            ForceHide(d)
+            d.Box.Visible = false; d.Name.Visible = false; d.HealthBar.Visible = false; d.HealthOutline.Visible = false
+            for _, l in pairs(d.Skeleton) do l.Visible = false end
         end
     end
-    
-    -- HARD LOCK LOGIC
-    if targetHead and ESP.LockOn then
-        -- Map 1-10 to 0.05-1.0 lerp factor
-        -- At 10, it is 1.0 (Instant, unshakeable stick)
-        local intensity = (ESP.Smoothness - 1) / 9
-        local lerpFactor = 0.05 + (intensity * 0.95)
-        
-        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetHead.Position), lerpFactor)
+
+    -- AIM EXECUTION
+    if targetPart and ESP.LockOn then
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot then
+            local alpha = math.clamp((ESP.Smoothness / 10) * (dt * 60), 0.01, 1)
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPart.Position), alpha)
+            local goalPos = Vector3.new(targetPart.Position.X, myRoot.Position.Y, targetPart.Position.Z)
+            myRoot.CFrame = myRoot.CFrame:Lerp(CFrame.lookAt(myRoot.Position, goalPos), alpha)
+        end
     end
 end)
 
--- Cleanup on Player Leave
+-- INPUT & BINDING
+UIS.InputBegan:Connect(function(input, gp)
+    if listening then
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            MenuKey = input.KeyCode; bindBtn.Text = "Menu Key: " .. MenuKey.Name; listening = false
+        end
+    elseif not gp and input.KeyCode == MenuKey then
+        main.Visible = not main.Visible
+    end
+end)
+
+-- CLEANUP
 Players.PlayerRemoving:Connect(function(p)
     if Drawings[p] then
-        for _, v in pairs(Drawings[p]) do
-            if typeof(v) == "userdata" then v:Remove() 
-            elseif type(v) == "table" then for _, l in pairs(v) do l:Remove() end end
-        end
+        for _, v in pairs(Drawings[p]) do if typeof(v) == "userdata" then v:Remove() elseif type(v) == "table" then for _, l in pairs(v) do l:Remove() end end end
         Drawings[p] = nil
-    end
-end)
-
--- Menu Input
-UIS.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if listening then
-        MenuKey = input.KeyCode
-        bindBtn.Text = "Menu Key: " .. MenuKey.Name
-        listening = false
-    elseif input.KeyCode == MenuKey then
-        main.Visible = not main.Visible
     end
 end)
