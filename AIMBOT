@@ -8,68 +8,44 @@ local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 local SaveFile = "Elite_Universal_V52.json"
 
---// SETTINGS & DEFAULTS
+--// SETTINGS
 local Settings = { 
     Names = false, Boxes = false, Health = false, Skeleton = false, Chams = false, 
     LockOn = false, TeamCheck = false, FriendCheck = false, WallCheck = false, 
     FOV = 150, Smoothness = 4, MaxDistance = 1000, 
-    MenuKey = "RightControl", LockBind = "V" 
+    MenuKey = "RightControl", LockBind = "V", SpeedBind = "G",
+    SpeedEnabled = false, Speed = 0 
 }
 
---// SAVE/LOAD LOGIC
-local function Save() 
-    pcall(function() writefile(SaveFile, Http:JSONEncode(Settings)) end)
-end
+--// CONFIG
+local function Save() pcall(function() writefile(SaveFile, Http:JSONEncode(Settings)) end) end
+if isfile(SaveFile) then pcall(function() local d = Http:JSONDecode(readfile(SaveFile)) for k, v in pairs(d) do Settings[k] = v end end) end
 
-if isfile(SaveFile) then 
-    pcall(function()
-        local d = Http:JSONDecode(readfile(SaveFile)) 
-        for k, v in pairs(d) do Settings[k] = v end 
-    end)
-end
-
---// GUI CORE SETUP
+--// GUI CORE
 local gui = Instance.new("ScreenGui", LP.PlayerGui); gui.Name = "EliteV52"; gui.ResetOnSpawn = false
 local main = Instance.new("Frame", gui); main.Size = UDim2.new(0, 460, 0, 420); main.Position = UDim2.new(0.5, -230, 0.5, -210); main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); main.Active = true; main.Draggable = true
 Instance.new("UICorner", main)
 
-local sidebar = Instance.new("Frame", main); sidebar.Size = UDim2.new(0, 110, 1, 0); sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-Instance.new("UICorner", sidebar)
-
+local sidebar = Instance.new("Frame", main); sidebar.Size = UDim2.new(0, 110, 1, 0); sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10); Instance.new("UICorner", sidebar)
 local container = Instance.new("Frame", main); container.Position = UDim2.new(0, 120, 0, 10); container.Size = UDim2.new(1, -130, 1, -20); container.BackgroundTransparency = 1
 
-local tabs = { 
-    Visuals = Instance.new("ScrollingFrame", container), 
-    Combat = Instance.new("ScrollingFrame", container), 
-    Settings = Instance.new("ScrollingFrame", container) 
-}
-
--- TAB NAVIGATION
+local tabs = { Visuals = Instance.new("ScrollingFrame", container), Combat = Instance.new("ScrollingFrame", container), Settings = Instance.new("ScrollingFrame", container) }
 for i, name in pairs({"Visuals", "Combat", "Settings"}) do
     local f = tabs[name]; f.Size = UDim2.new(1, 0, 1, 0); f.Visible = (i == 1); f.BackgroundTransparency = 1; f.CanvasSize = UDim2.new(0, 0, 0, 600); f.ScrollBarThickness = 0
     Instance.new("UIListLayout", f).Padding = UDim.new(0, 5)
-    
-    local btn = Instance.new("TextButton", sidebar); btn.Size = UDim2.new(0, 90, 0, 35); btn.Position = UDim2.new(0, 10, 0, (i-1) * 45 + 20); btn.Text = name; btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25); btn.TextColor3 = Color3.new(1, 1, 1); btn.Font = "GothamBold"
-    Instance.new("UICorner", btn)
+    local btn = Instance.new("TextButton", sidebar); btn.Size = UDim2.new(0, 90, 0, 35); btn.Position = UDim2.new(0, 10, 0, (i-1) * 45 + 20); btn.Text = name; btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25); btn.TextColor3 = Color3.new(1, 1, 1); btn.Font = "GothamBold"; Instance.new("UICorner", btn)
     btn.MouseButton1Click:Connect(function() for _, v in pairs(tabs) do v.Visible = false end f.Visible = true end)
 end
 
-local lockToggleBtn -- Global for syncing
+local lockToggleBtn, speedToggleBtn
 
---// UI CONSTRUCTORS
+--// UI BUILDERS
 local function CreateToggle(txt, key, p)
     local h = Instance.new("Frame", p); h.Size = UDim2.new(1, -5, 0, 35); h.BackgroundColor3 = Color3.fromRGB(20, 20, 20); Instance.new("UICorner", h)
     local b = Instance.new("TextButton", h); b.Size = UDim2.new(0, 45, 0, 20); b.Position = UDim2.new(1, -50, 0.5, -10); b.Text = Settings[key] and "ON" or "OFF"; b.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(50, 50, 50); b.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", b).CornerRadius = UDim.new(1,0)
     local l = Instance.new("TextLabel", h); l.Text = "  "..txt; l.Size = UDim2.new(0.7,0,1,0); l.BackgroundTransparency = 1; l.TextColor3 = Color3.new(1,1,1); l.TextXAlignment = "Left"; l.Font = "Gotham"
-    
-    if key == "LockOn" then lockToggleBtn = b end
-
-    b.MouseButton1Click:Connect(function()
-        Settings[key] = not Settings[key]
-        b.Text = Settings[key] and "ON" or "OFF"
-        b.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(50, 50, 50)
-        Save()
-    end)
+    if key == "LockOn" then lockToggleBtn = b elseif key == "SpeedEnabled" then speedToggleBtn = b end
+    b.MouseButton1Click:Connect(function() Settings[key] = not Settings[key]; b.Text = Settings[key] and "ON" or "OFF"; b.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(50, 50, 50); Save() end)
 end
 
 local function CreateSlider(txt, min, max, key, p)
@@ -86,18 +62,13 @@ local function CreateBind(txt, current, callback, p)
     local l = Instance.new("TextLabel", h); l.Text = "  "..txt; l.Size = UDim2.new(0.6,0,1,0); l.BackgroundTransparency = 1; l.TextColor3 = Color3.new(1,1,1); l.TextXAlignment = "Left"; l.Font = "Gotham"
     local listening = false 
     b.MouseButton1Click:Connect(function() listening = true; b.Text = "..." end) 
-    UIS.InputBegan:Connect(function(i) 
-        if listening and (i.UserInputType == Enum.UserInputType.Keyboard or i.UserInputType == Enum.UserInputType.MouseButton2) then 
-            local k = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode.Name or i.UserInputType.Name
-            listening = false; b.Text = k; callback(k); Save() 
-        end 
-    end) 
+    UIS.InputBegan:Connect(function(i) if listening and (i.UserInputType == Enum.UserInputType.Keyboard or i.UserInputType == Enum.UserInputType.MouseButton2) then local k = i.KeyCode ~= Enum.KeyCode.Unknown and i.KeyCode.Name or i.UserInputType.Name; listening = false; b.Text = k; callback(k); Save() end end) 
 end
 
--- POPULATE TABS
+-- POPULATE
 CreateToggle("Names", "Names", tabs.Visuals); CreateToggle("Boxes", "Boxes", tabs.Visuals); CreateToggle("Health", "Health", tabs.Visuals); CreateToggle("Skeleton", "Skeleton", tabs.Visuals); CreateToggle("Chams", "Chams", tabs.Visuals)
 CreateToggle("Enable Aim-Lock", "LockOn", tabs.Combat); CreateBind("Lock Bind", Settings.LockBind, function(k) Settings.LockBind = k end, tabs.Combat); CreateToggle("Team Check", "TeamCheck", tabs.Combat); CreateToggle("Friend Check", "FriendCheck", tabs.Combat); CreateToggle("Wall Check", "WallCheck", tabs.Combat); CreateSlider("FOV", 30, 800, "FOV", tabs.Combat); CreateSlider("Smoothness", 1, 15, "Smoothness", tabs.Combat); CreateSlider("Max Distance", 100, 5000, "MaxDistance", tabs.Combat)
-CreateBind("Menu Key", Settings.MenuKey, function(k) Settings.MenuKey = k end, tabs.Settings)
+CreateBind("Menu Key", Settings.MenuKey, function(k) Settings.MenuKey = k end, tabs.Settings); CreateToggle("Enable Speed", "SpeedEnabled", tabs.Settings); CreateBind("Speed Bind", Settings.SpeedBind, function(k) Settings.SpeedBind = k end, tabs.Settings); CreateSlider("Speed Multiplier", 0, 50, "Speed", tabs.Settings)
 
 --// LOGIC ENGINE
 local FOV_Ring = Drawing.new("Circle"); FOV_Ring.Thickness = 1; FOV_Ring.Color = Color3.new(1,1,1); FOV_Ring.Transparency = 0.5
@@ -113,11 +84,25 @@ local function GetDraws(p)
 end
 
 local function IsVisible(part)
-    if not Settings.WallCheck then return true end
-    local cast = Cam:GetPartsObscuringTarget({part.Position}, {LP.Character, part.Parent})
-    return #cast == 0
+    local char = part.Parent
+    local castParams = RaycastParams.new()
+    castParams.FilterType = Enum.RaycastFilterType.Exclude
+    castParams.FilterDescendantsInstances = {LP.Character, Cam, char}
+    local res = workspace:Raycast(Cam.CFrame.Position, (part.Position - Cam.CFrame.Position), castParams)
+    return res == nil
 end
 
+-- Speed Logic
+RunService.Heartbeat:Connect(function()
+    if Settings.SpeedEnabled and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            LP.Character.HumanoidRootPart.CFrame += (hum.MoveDirection * (Settings.Speed / 10))
+        end
+    end
+end)
+
+-- Main Render Loop
 RunService.RenderStepped:Connect(function(dt)
     local center = Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2)
     FOV_Ring.Visible = Settings.LockOn; FOV_Ring.Position = center; FOV_Ring.Radius = Settings.FOV
@@ -126,73 +111,84 @@ RunService.RenderStepped:Connect(function(dt)
 
     for _, p in pairs(Players:GetPlayers()) do
         if p == LP then continue end
-        local d = GetDraws(p); d.Box.Visible = false; d.Name.Visible = false; d.HealthBar.Visible = false; d.HealthOutline.Visible = false
-        for _, l in pairs(d.Skeleton) do l.Visible = false end
+        local d = GetDraws(p)
+        local char = p.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
 
-        if (Settings.TeamCheck and p.Team == LP.Team) or (Settings.FriendCheck and LP:IsFriendsWith(p.UserId)) then 
-            if p.Character and p.Character:FindFirstChild("EliteCham") then p.Character.EliteCham:Destroy() end
+        -- Filter Teammates/Friends + Logic cleanup
+        if (Settings.TeamCheck and p.Team == LP.Team) or (Settings.FriendCheck and LP:IsFriendsWith(p.UserId)) or not char or not hum or hum.Health <= 0 or not root then 
+            d.Box.Visible = false; d.Name.Visible = false; d.HealthBar.Visible = false; d.HealthOutline.Visible = false
+            for _, l in pairs(d.Skeleton) do l.Visible = false end
+            if char and char:FindFirstChild("EliteCham") then char.EliteCham:Destroy() end
             continue 
         end
 
-        local char = p.Character
-        if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            local head = char:FindFirstChild("Head")
-            if root and head then
-                local pos, visible = Cam:WorldToViewportPoint(root.Position)
-                local mag = (root.Position - Cam.CFrame.Position).Magnitude
+        local pos, onScreen = Cam:WorldToViewportPoint(root.Position)
+        local dist = (root.Position - Cam.CFrame.Position).Magnitude
                 
-                if visible and mag < Settings.MaxDistance then
-                    -- ESP Rendering
-                    local headP = Cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.6, 0))
-                    local btmP = Cam:WorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))
-                    local h = math.abs(headP.Y - btmP.Y); local w = h / 1.6
+        if onScreen and dist < Settings.MaxDistance then
+            local head = char:FindFirstChild("Head")
+            if head then
+                local headP = Cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.6, 0))
+                local btmP = Cam:WorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))
+                local h = math.abs(headP.Y - btmP.Y); local w = h / 1.6
 
-                    if Settings.Boxes then d.Box.Visible = true; d.Box.Size = Vector2.new(w, h); d.Box.Position = Vector2.new(pos.X - w/2, headP.Y) end
-                    if Settings.Names then d.Name.Visible = true; d.Name.Position = Vector2.new(pos.X, headP.Y - 15); d.Name.Text = p.Name end
-                    if Settings.Health then
-                        local ratio = char.Humanoid.Health / char.Humanoid.MaxHealth
-                        d.HealthOutline.Visible = true; d.HealthOutline.Position = Vector2.new(pos.X - w/2 - 6, headP.Y); d.HealthOutline.Size = Vector2.new(4, h)
-                        d.HealthBar.Visible = true; d.HealthBar.Position = Vector2.new(pos.X - w/2 - 5, headP.Y + (h * (1-ratio))); d.HealthBar.Size = Vector2.new(2, h * ratio); d.HealthBar.Color = Color3.fromHSV(ratio * 0.3, 1, 1)
-                    end
-                    if Settings.Skeleton then
-                        for i, b in pairs(Bones) do
-                            local p1, p2 = char:FindFirstChild(b[1]), char:FindFirstChild(b[2])
-                            if p1 and p2 and d.Skeleton[i] then
-                                local v1, os1 = Cam:WorldToViewportPoint(p1.Position); local v2, os2 = Cam:WorldToViewportPoint(p2.Position)
-                                if os1 and os2 then d.Skeleton[i].Visible = true; d.Skeleton[i].From = Vector2.new(v1.X, v1.Y); d.Skeleton[i].To = Vector2.new(v2.X, v2.Y) end
-                            end
-                        end
-                    end
-                    if Settings.Chams then
-                        local hi = char:FindFirstChild("EliteCham") or Instance.new("Highlight", char); hi.Name = "EliteCham"; hi.FillColor = Color3.fromRGB(0, 255, 120)
-                    elseif char:FindFirstChild("EliteCham") then char.EliteCham:Destroy() end
+                d.Box.Visible = Settings.Boxes; d.Box.Size = Vector2.new(w, h); d.Box.Position = Vector2.new(pos.X - w/2, headP.Y)
+                d.Name.Visible = Settings.Names; d.Name.Position = Vector2.new(pos.X, headP.Y - 15); d.Name.Text = p.Name
+                
+                if Settings.Health then
+                    local ratio = hum.Health / hum.MaxHealth
+                    d.HealthOutline.Visible = true; d.HealthOutline.Position = Vector2.new(pos.X - w/2 - 6, headP.Y); d.HealthOutline.Size = Vector2.new(4, h)
+                    d.HealthBar.Visible = true; d.HealthBar.Position = Vector2.new(pos.X - w/2 - 5, headP.Y + (h * (1-ratio))); d.HealthBar.Size = Vector2.new(2, h * ratio); d.HealthBar.Color = Color3.fromHSV(ratio * 0.3, 1, 1)
+                else
+                    d.HealthBar.Visible = false; d.HealthOutline.Visible = false
+                end
 
-                    -- Aim Logic (Head Only)
-                    local sDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if sDist < minDistance and IsVisible(head) then minDistance = sDist; target = head end
+                if Settings.Skeleton then
+                    for i, b in pairs(Bones) do
+                        local p1, p2 = char:FindFirstChild(b[1]), char:FindFirstChild(b[2])
+                        if p1 and p2 then
+                            local v1, os1 = Cam:WorldToViewportPoint(p1.Position); local v2, os2 = Cam:WorldToViewportPoint(p2.Position)
+                            d.Skeleton[i].Visible = os1 and os2; d.Skeleton[i].From = Vector2.new(v1.X, v1.Y); d.Skeleton[i].To = Vector2.new(v2.X, v2.Y)
+                        else d.Skeleton[i].Visible = false end
+                    end
+                else
+                    for _, l in pairs(d.Skeleton) do l.Visible = false end
+                end
+
+                if Settings.Chams then
+                    if not char:FindFirstChild("EliteCham") then
+                        local hi = Instance.new("Highlight", char); hi.Name = "EliteCham"; hi.FillColor = Color3.fromRGB(0, 255, 120)
+                    end
+                elseif char:FindFirstChild("EliteCham") then char.EliteCham:Destroy() end
+
+                -- Optimization: Aim Logic
+                local sDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if sDist < minDistance then 
+                    if not Settings.WallCheck or IsVisible(head) then
+                        minDistance = sDist; target = head 
+                    end
                 end
             end
+        else
+            d.Box.Visible = false; d.Name.Visible = false; d.HealthBar.Visible = false; d.HealthOutline.Visible = false
+            for _, l in pairs(d.Skeleton) do l.Visible = false end
         end
     end
     
     if target and Settings.LockOn then
-        local targetCF = CFrame.lookAt(Cam.CFrame.Position, target.Position)
-        local alpha = math.clamp((Settings.Smoothness / 10) * (dt * 60), 0.05, 1)
-        Cam.CFrame = Cam.CFrame:Lerp(targetCF, alpha)
+        Cam.CFrame = Cam.CFrame:Lerp(CFrame.lookAt(Cam.CFrame.Position, target.Position), math.clamp((Settings.Smoothness / 10) * (dt * 60), 0.05, 1))
     end
 end)
 
 --// INPUTS
 UIS.InputBegan:Connect(function(i, g) 
     if g then return end
-    if i.KeyCode.Name == Settings.MenuKey then main.Visible = not main.Visible 
-    elseif i.KeyCode.Name == Settings.LockBind or i.UserInputType.Name == Settings.LockBind then 
-        Settings.LockOn = not Settings.LockOn
-        if lockToggleBtn then
-            lockToggleBtn.Text = Settings.LockOn and "ON" or "OFF"
-            lockToggleBtn.BackgroundColor3 = Settings.LockOn and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(50, 50, 50)
-        end
+    local key = i.KeyCode.Name == "Unknown" and i.UserInputType.Name or i.KeyCode.Name
+    if key == Settings.MenuKey then main.Visible = not main.Visible 
+    elseif key == Settings.LockBind then Settings.LockOn = not Settings.LockOn; lockToggleBtn.Text = Settings.LockOn and "ON" or "OFF"; lockToggleBtn.BackgroundColor3 = Settings.LockOn and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(50, 50, 50)
+    elseif key == Settings.SpeedBind then Settings.SpeedEnabled = not Settings.SpeedEnabled; speedToggleBtn.Text = Settings.SpeedEnabled and "ON" or "OFF"; speedToggleBtn.BackgroundColor3 = Settings.SpeedEnabled and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(50, 50, 50)
     end 
 end)
 
